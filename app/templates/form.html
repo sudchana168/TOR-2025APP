@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white shadow sm:rounded-lg p-6">
+    <h2 class="text-2xl font-bold mb-6 text-gray-900">{% if item %}Edit{% else %}Add{% endif %} TOR Item</h2>
+
+    <form action="{% if item %}/edit/{{ item.id }}{% else %}/add{% endif %}" method="POST" class="space-y-6">
+        <div>
+            <label for="task_id" class="block text-sm font-medium text-gray-700">Task ID</label>
+            <input type="text" name="task_id" id="task_id" required value="{{ item.task_id if item else '' }}"
+                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        </div>
+
+        <div>
+            <label for="task_name" class="block text-sm font-medium text-gray-700">Task Name</label>
+            <input type="text" name="task_name" id="task_name" required value="{{ item.task_name if item else '' }}"
+                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        </div>
+
+        <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+            <div>
+                <label for="start_date" class="block text-sm font-medium text-gray-700">Start Date</label>
+                <input type="date" name="start_date" id="start_date" required
+                    value="{{ item.start_date if item else '' }}"
+                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+
+            <div>
+                <label for="end_date" class="block text-sm font-medium text-gray-700">End Date</label>
+                <input type="date" name="end_date" id="end_date" required value="{{ item.end_date if item else '' }}"
+                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+        </div>
+
+        <div>
+            <label for="responsible" class="block text-sm font-medium text-gray-700">Responsible</label>
+            <input type="text" name="responsible" id="responsible" value="{{ item.responsible if item else '' }}"
+                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        </div>
+
+        <div>
+            <label for="progress" class="block text-sm font-medium text-gray-700">Progress (%)</label>
+            <input type="number" step="0.01" name="progress" id="progress" value="{{ item.progress if item else '0' }}"
+                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        </div>
+
+        <div class="flex justify-end space-x-3">
+            <a href="/"
+                class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">Cancel</a>
+            <button type="submit"
+                class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">Save</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
