@@ -2,6 +2,20 @@ from pydantic import BaseModel
 from datetime import date
 from typing import Optional
 
+class ProjectBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class ProjectCreate(ProjectBase):
+    pass
+
+class Project(ProjectBase):
+    id: int
+    created_at: date
+
+    class Config:
+        from_attributes = True
+
 class TORItemBase(BaseModel):
     task_id: str
     task_name: str
@@ -11,12 +25,14 @@ class TORItemBase(BaseModel):
     progress: Optional[float] = 0.0
 
 class TORItemCreate(TORItemBase):
-    pass
+    source_file: Optional[str] = "Manual Input"
+    project_id: int
 
 class TORItem(TORItemBase):
     id: int
-    warranty_end_date: date
+    project_id: int
     email_sent: bool
+    source_file: str
 
     class Config:
         from_attributes = True

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +13,7 @@
         }
     </style>
 </head>
+
 <body class="bg-gray-50 text-gray-900">
     <div class="min-h-screen flex flex-col">
         <nav class="bg-white shadow-sm border-b border-gray-200">
@@ -19,19 +21,25 @@
                 <div class="flex justify-between h-16">
                     <div class="flex">
                         <div class="flex-shrink-0 flex items-center">
-                            <h1 class="text-xl font-bold text-indigo-600">TOR Reminder</h1>
+                            <a href="/"
+                                class="text-xl font-bold text-indigo-600 hover:text-indigo-700 transition-colors">TOR
+                                Reminder</a>
                         </div>
                         <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                            <a href="/" class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            <a href="/"
+                                class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                                 Dashboard
                             </a>
                             <!-- Add more links here if needed -->
                         </div>
                     </div>
                     <div class="flex items-center">
-                        <button onclick="document.getElementById('uploadModal').classList.remove('hidden')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        {% if project %}
+                        <button onclick="document.getElementById('uploadModal').classList.remove('hidden')"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                             Import Excel
                         </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -55,13 +63,16 @@
             <form id="uploadForm" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Select File</label>
-                    <input type="file" id="fileInput" accept=".xlsx, .xls" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                    <input type="file" id="fileInput" accept=".xlsx, .xls"
+                        class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
                 </div>
                 <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="document.getElementById('uploadModal').classList.add('hidden')" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
+                    <button type="button" onclick="document.getElementById('uploadModal').classList.add('hidden')"
+                        class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
                         Cancel
                     </button>
-                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
+                    <button type="submit"
+                        class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
                         Upload
                     </button>
                 </div>
@@ -78,12 +89,20 @@
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
 
+            // project.id is only available in project dashboard context
+            // checking if project exists
+            const projectId = "{{ project.id if project else '' }}";
+            if (!projectId) {
+                alert("Cannot upload without a selected project.");
+                return;
+            }
+
             try {
-                const response = await fetch('/upload/', {
+                const response = await fetch(`/projects/${projectId}/upload/`, {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 if (response.ok) {
                     alert('File uploaded successfully!');
                     window.location.reload();
@@ -97,4 +116,5 @@
         });
     </script>
 </body>
+
 </html>

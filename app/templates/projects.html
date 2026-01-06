@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-white shadow sm:rounded-lg">
+    <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-lg leading-6 font-medium text-gray-900">Projects</h3>
+        <div class="mt-2 text-sm text-gray-500">
+            <p>Select a project to view its dashboard or create a new one.</p>
+        </div>
+        <div class="mt-5">
+            <button onclick="document.getElementById('createProjectModal').classList.remove('hidden')" type="button"
+                class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Create New Project
+            </button>
+            <a href="/template"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ml-3">
+                Export Template
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="mt-8 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+    {% for project in projects %}
+    <a href="/projects/{{ project.id }}/dashboard"
+        class="block bg-white shadow rounded-lg hover:shadow-md transition-shadow">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">{{ project.name }}</h3>
+            <p class="mt-2 text-sm text-gray-500">{{ project.description or 'No description' }}</p>
+            <p class="mt-4 text-xs text-gray-400">Created: {{ project.created_at }}</p>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- Create Project Modal -->
+<div id="createProjectModal"
+    class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full shadow-xl">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">New Project</h3>
+        <form action="/projects/" method="POST" class="space-y-4">
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700">Project Name</label>
+                <input type="text" name="name" id="name" required
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2 border">
+            </div>
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+                <textarea name="description" id="description" rows="3"
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2 border"></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="document.getElementById('createProjectModal').classList.add('hidden')"
+                    class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit"
+                    class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
+                    Create
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

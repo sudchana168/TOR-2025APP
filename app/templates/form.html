@@ -4,7 +4,8 @@
 <div class="max-w-2xl mx-auto bg-white shadow sm:rounded-lg p-6">
     <h2 class="text-2xl font-bold mb-6 text-gray-900">{% if item %}Edit{% else %}Add{% endif %} TOR Item</h2>
 
-    <form action="{% if item %}/edit/{{ item.id }}{% else %}/add{% endif %}" method="POST" class="space-y-6">
+    <form action="{% if item %}/edit/{{ item.id }}{% else %}/projects/{{ project.id }}/add{% endif %}" method="POST"
+        class="space-y-6">
         <div>
             <label for="task_id" class="block text-sm font-medium text-gray-700">Task ID</label>
             <input type="text" name="task_id" id="task_id" required value="{{ item.task_id if item else '' }}"
@@ -45,7 +46,7 @@
         </div>
 
         <div class="flex justify-end space-x-3">
-            <a href="/"
+            <a href="/projects/{{ item.project_id if item else project.id }}/dashboard"
                 class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">Cancel</a>
             <button type="submit"
                 class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">Save</button>

@@ -4,67 +4,69 @@
 <div class="bg-white shadow overflow-hidden sm:rounded-lg">
     <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
         <div>
-            <h3 class="text-lg leading-6 font-medium text-gray-900">TOR Items</h3>
-            <p class="mt-1 max-w-2xl text-sm text-gray-500">Overview of all tasks and warranty status.</p>
+            <div class="flex items-center space-x-2">
+                <a href="/" class="text-indigo-600 hover:text-indigo-900">&larr; Back</a>
+                <h3 class="text-lg leading-6 font-medium text-gray-900">TOR Items - {{ project.name }}</h3>
+            </div>
+            <p class="mt-1 max-w-2xl text-sm text-gray-500">{{ project.description or '' }}</p>
         </div>
         <div class="flex space-x-3">
-            <a href="/add"
+            <a href="/projects/{{ project.id }}/add"
                 class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 Add Item
             </a>
         </div>
+    </div>
+    <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8 px-4" aria-label="Tabs" id="tabs-container">
+            <!-- Tabs will be injected here by JS -->
+        </nav>
     </div>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID
+                        class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task Name
+                        class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task Name
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start
+                        class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start
                         Date</th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date
+                        class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Warranty
-                        End</th>
-                    <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Responsible</th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress
+                        class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress
                     </th>
-                    <th scope="col" class="relative px-6 py-3">
+                    <th scope="col" class="relative px-3 py-3">
                         <span class="sr-only">Edit</span>
                     </th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 {% for item in items %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.task_id }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-500 break-words min-w-[300px]">{{ item.task_name }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.start_date }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.end_date }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span
-                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            {{ item.warranty_end_date }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.responsible or '-' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                <tr class="hover:bg-gray-50" data-source="{{ item.source_file }}">
+                    <td class="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.task_id }}</td>
+                    <td class="px-3 py-4 text-sm text-gray-500 break-words max-w-[200px]">{{ item.task_name }}</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">{{
+                        item.start_date.strftime('%d-%m-%Y') if item.start_date else '' }}</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.end_date.strftime('%d-%m-%Y')
+                        if item.end_date else '' }}</td>
+                    <td class="px-3 py-4 text-sm text-gray-500 whitespace-normal break-words max-w-[150px]">{{
+                        item.responsible or '-' }}</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 min-w-[50px]">
                             <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ item.progress }}%"></div>
                         </div>
                         <span class="text-xs">{{ item.progress }}%</span>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td class="px-3 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <a href="/edit/{{ item.id }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
                     </td>
                 </tr>
@@ -73,4 +75,117 @@
         </table>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const tableBody = document.querySelector('tbody');
+        const rows = Array.from(tableBody.querySelectorAll('tr'));
+        const tabsContainer = document.getElementById('tabs-container');
+
+        // 1. Identify Sources
+        const sources = new Set();
+        rows.forEach(row => {
+            const source = row.getAttribute('data-source');
+            if (source) sources.add(source);
+        });
+
+        // Always include Manual Input if not present (though we filter by it, so only needed if we want an empty tab)
+        // Actually, we should only create tabs for sources that exist OR are 'Manual Input' to allow adding manually?
+        // User wants "Import Excel" and "Manual Add" separated. 
+        // Let's create specific tabs: "All", "Manual Input", and then any others found.
+
+        const uniqueSources = Array.from(sources).filter(s => s !== 'Manual Input').sort();
+
+        // 2. Build Tabs
+        const tabs = [
+            { name: 'All Data', filter: 'all', type: 'system' },
+            { name: 'Manual Input', filter: 'Manual Input', type: 'system' },
+            ...uniqueSources.map(s => ({ name: s, filter: s, type: 'excel' }))
+        ];
+
+        let activeTab = localStorage.getItem('activeTab') || 'All Data';
+        // If saved tab doesn't exist anymore, revert to All
+        if (!tabs.find(t => t.name === activeTab)) activeTab = 'All Data';
+
+        function renderTabs() {
+            tabsContainer.innerHTML = '';
+            tabs.forEach(tab => {
+                const isSelected = tab.name === activeTab;
+                const tabClass = isSelected
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300';
+
+                const btn = document.createElement('div');
+                btn.className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center cursor-pointer ${tabClass}`;
+
+                // Tab Name Click
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = tab.name;
+                nameSpan.onclick = () => {
+                    activeTab = tab.name;
+                    localStorage.setItem('activeTab', activeTab); // Persist selection
+                    renderTabs();
+                    filterTable();
+                };
+                btn.appendChild(nameSpan);
+
+                // Delete Button for Excel files
+                if (tab.type === 'excel') {
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'ml-2 text-gray-400 hover:text-red-500';
+                    delBtn.innerHTML = '&times;'; // X icon
+                    delBtn.title = 'Delete File';
+                    delBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Are you sure you want to delete all data from ${tab.name}?`)) {
+                            await deleteSource(tab.name);
+                        }
+                    };
+                    btn.appendChild(delBtn);
+                }
+
+                tabsContainer.appendChild(btn);
+            });
+        }
+
+        function filterTable() {
+            rows.forEach(row => {
+                const source = row.getAttribute('data-source');
+                if (activeTab === 'All Data') {
+                    row.style.display = '';
+                } else {
+                    if (source === activeTab) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
+        }
+
+        async function deleteSource(sourceName) {
+            try {
+                const res = await fetch(`/projects/{{ project.id }}/delete_source/${encodeURIComponent(sourceName)}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    // Determine new active tab if we deleted the current one using checks
+                    if (activeTab === sourceName) {
+                        activeTab = 'All Data';
+                        localStorage.setItem('activeTab', activeTab);
+                    }
+                    window.location.reload();
+                } else {
+                    alert('Failed to delete.');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error deleting source.');
+            }
+        }
+
+        renderTabs();
+        filterTable();
+    });
+</script>
 {% endblock %}

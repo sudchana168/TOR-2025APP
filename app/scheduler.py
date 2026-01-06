@@ -1,6 +1,7 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
+from dateutil.relativedelta import relativedelta
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -20,18 +21,24 @@ SMTP_PORT = int(clean_env(os.getenv("MAIL_PORT", "587")))
 SMTP_USERNAME = clean_env(os.getenv("MAIL_USERNAME"))
 SMTP_PASSWORD = clean_env(os.getenv("MAIL_PASSWORD"))
 SMTP_FROM = clean_env(os.getenv("MAIL_FROM"))
-DATE_ALERT = clean_env(os.getenv("DATE_ALERT"))
-DATE_ALERT = int(clean_env(os.getenv("DATE_ALERT")))
-print("DATE_ALERT : ")
-print(DATE_ALERT)
+DATE_ALERT = int(clean_env(os.getenv("DATE_ALERT", "7")))
 
+# LINE Configuration
+LINE_CHANNEL_ACCESS_TOKEN = clean_env(os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
+LINE_USER_ID = clean_env(os.getenv("LINE_USER_ID"))
+LINE_RETRY_KEY = clean_env(os.getenv("LINE_RETRY_KEY")) # Optional
+ALERT_METHOD = clean_env(os.getenv("ALERT_METHOD", "EMAIL")).upper() # EMAIL or LINE
+
+print(f"DATE_ALERT :  {DATE_ALERT}")
+print(f"ALERT_METHOD: {ALERT_METHOD}")
 
 
 def send_email(to_email: str, subject: str, body: str):
     if not SMTP_USERNAME or not SMTP_PASSWORD:
         print("SMTP credentials not set. Skipping email.")
         print(f"Would have sent email to {to_email}: {subject}")
-        print(f"Would have sent email to {to_email}: {subject}")
+        return
+
     # Sanitize inputs
     subject = clean_env(subject)
     body = clean_env(body)
@@ -60,25 +67,61 @@ def send_email(to_email: str, subject: str, body: str):
         import traceback
         traceback.print_exc()
 
+import requests
+import uuid
+import json
+
+def send_line_message(messages: list):
+    if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_USER_ID:
+        print("LINE credentials not set. Skipping LINE message.")
+        return
+
+    url = "https://api.line.me/v2/bot/message/push"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
+        "X-Line-Retry-Key": LINE_RETRY_KEY if LINE_RETRY_KEY else str(uuid.uuid4())
+    }
+    
+    # LINE allows max 5 messages per request.
+    # If we have more, we might need to batch them, but strictly following the loop logic below 
+    # we are sending per item or batching all? 
+    # The original email logic sent one email PER ITEM if reminders existed.
+    # Let's keep it simple: formatting the reminders into text messages.
+    
+    payload = {
+        "to": LINE_USER_ID,
+        "messages": messages
+    }
+
+    try:
+        print(f"Sending LINE push message to {LINE_USER_ID}")
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        print("LINE message sent successfully.")
+    except Exception as e:
+        print(f"Failed to send LINE message: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Response: {e.response.text}")
+
+
 def check_reminders():
     print("Checking for reminders...")
     db = database.SessionLocal()
     try:
         today = date.today()
-        # Logic: Notify 7 days before due date, or on the day
-        # You can customize this logic
         
         items = db.query(models.TORItem).all()
         
         for item in items:
             reminders = []
             
-            # Check Start Date
-            if item.start_date:
-                if item.start_date == today:
-                    reminders.append(f"Task '{item.task_name}' starts TODAY ({item.start_date}).")
-                elif item.start_date == today + timedelta(days=DATE_ALERT):
-                    reminders.append(f"Task '{item.task_name}' starts in {DATE_ALERT} days ({item.start_date}).")
+            # # Check Start Date.  *******
+            # if item.start_date:
+            #     if item.start_date == today:
+            #         reminders.append(f"Task '{item.task_name}' starts TODAY ({item.start_date}).")
+            #     elif item.start_date == today + timedelta(days=DATE_ALERT):
+            #         reminders.append(f"Task '{item.task_name}' starts in {DATE_ALERT} days ({item.start_date}).")
 
             # Check End Date
             if item.end_date:
@@ -87,20 +130,33 @@ def check_reminders():
                 elif item.end_date == today + timedelta(days=DATE_ALERT):
                     reminders.append(f"Task '{item.task_name}' ends in {DATE_ALERT} days ({item.end_date}).")
 
-            # Check Warranty
-            if item.warranty_end_date:
-                if item.warranty_end_date == today:
-                    reminders.append(f"Warranty for '{item.task_name}' expires TODAY ({item.warranty_end_date}).")
-                elif item.warranty_end_date == today + timedelta(days=DATE_ALERT): # 30 days for warranty maybe?
-                    reminders.append(f"Warranty for '{item.task_name}' expires in {DATE_ALERT} days ({item.warranty_end_date}).")
-
             if reminders:
-                # Send email
-                # For now, sending to the configured sender or a fixed admin email
-                # In a real app, you might want to send to 'item.responsible' if it's an email
                 subject = f"TOR Reminder: {item.task_name}"
-                body = "<ul>" + "".join([f"<li>{r}</li>" for r in reminders]) + "</ul>"
-                send_email(SMTP_FROM, subject, body) # Sending to self for now
+                
+                if ALERT_METHOD == "LINE":
+                    # Create LINE text messages
+                    # LINE Text message object format: {"type": "text", "text": "..."}
+                    line_msgs = []
+                    
+                    # # Header message
+                    # line_msgs.append({
+                    #     "type": "text",
+                    #     "text": f"🔔 {subject}"
+                    # })
+                    
+                    # Content message (combining reminders to avoid blowing limits)
+                    body_text = "\n".join([f"- {r}" for r in reminders])
+                    line_msgs.append({
+                        "type": "text",
+                        "text": body_text
+                    })
+                    
+                    send_line_message(line_msgs)
+                    
+                else: 
+                    # Default to EMAIL
+                    body = "<ul>" + "".join([f"<li>{r}</li>" for r in reminders]) + "</ul>"
+                    send_email(SMTP_FROM, subject, body) 
 
     finally:
         db.close()
