@@ -20,6 +20,7 @@ def start_scheduler():
 
 import os
 
+
 if not os.path.exists("app/static"):
     os.makedirs("app/static")
 
