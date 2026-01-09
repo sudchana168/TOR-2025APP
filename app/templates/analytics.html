@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-white shadow sm:rounded-lg mb-6">
+    <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
+        <div>
+            <div class="flex items-center space-x-2">
+                <a href="/projects/{{ project.id }}/dashboard" class="text-indigo-600 hover:text-indigo-900">&larr; Back
+                    to Dashboard</a>
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Analytics - {{ project.name }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+    <!-- Total Tasks -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Total Tasks</dt>
+            <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ stats.total_tasks }}</dd>
+        </div>
+    </div>
+
+    <!-- Avg Progress -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Average Progress</dt>
+            <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ stats.avg_progress }}%</dd>
+        </div>
+    </div>
+
+    <!-- Overdue -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Overdue Tasks</dt>
+            <dd class="mt-1 text-3xl font-semibold text-red-600">{{ stats.overdue_tasks }}</dd>
+        </div>
+    </div>
+
+    <!-- Completed -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Completed Tasks</dt>
+            <dd class="mt-1 text-3xl font-semibold text-green-600">{{ stats.completed_tasks }}</dd>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Status Chart -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h4 class="text-base font-medium text-gray-900 mb-4">Task Status Distribution</h4>
+        <div class="relative h-64">
+            <canvas id="statusChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Any other charts can go here, maybe Responsible distribution -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h4 class="text-base font-medium text-gray-900 mb-4">Tasks by Responsible</h4>
+        <div class="relative h-64">
+            <canvas id="responsibleChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Data from Backend
+    const chartData = {{ chart_data | tojson }};
+
+    // Status Chart
+    const ctxStatus = document.getElementById('statusChart').getContext('2d');
+    new Chart(ctxStatus, {
+        type: 'doughnut',
+        data: {
+            labels: ['Not Started', 'In Progress', 'Completed'],
+            datasets: [{
+                data: [
+                    chartData.status.not_started,
+                    chartData.status.in_progress,
+                    chartData.status.completed
+                ],
+                backgroundColor: ['#E5E7EB', '#3B82F6', '#10B981'],
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            }
+        }
+    });
+
+    // Responsible Chart
+    const ctxResp = document.getElementById('responsibleChart').getContext('2d');
+    new Chart(ctxResp, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(chartData.responsible),
+            datasets: [{
+                label: 'Tasks',
+                data: Object.values(chartData.responsible),
+                backgroundColor: '#6366F1',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

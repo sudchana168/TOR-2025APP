@@ -6,10 +6,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
-from . import models, database
+from . import models, database, line_templates, email_templates
 from email.header import Header
 
-# Email Configuration
 # Email Configuration
 def clean_env(value):
     if value:
@@ -21,6 +20,7 @@ SMTP_PORT = int(clean_env(os.getenv("MAIL_PORT", "587")))
 SMTP_USERNAME = clean_env(os.getenv("MAIL_USERNAME"))
 SMTP_PASSWORD = clean_env(os.getenv("MAIL_PASSWORD"))
 SMTP_FROM = clean_env(os.getenv("MAIL_FROM"))
+MAIL_TO = clean_env(os.getenv("MAIL_TO"))
 DATE_ALERT = int(clean_env(os.getenv("DATE_ALERT", "7")))
 
 # LINE Configuration
@@ -43,6 +43,9 @@ def send_email(to_email: str, subject: str, body: str):
     subject = clean_env(subject)
     body = clean_env(body)
     to_email = clean_env(to_email)
+
+    print(f"TO EMAIL : {to_email}")
+
     
     msg = MIMEMultipart()
     msg['From'] = SMTP_FROM
@@ -53,8 +56,15 @@ def send_email(to_email: str, subject: str, body: str):
     msg.attach(MIMEText(body, 'html', 'utf-8'))
     try:
         print(f"Connecting to SMTP: {SMTP_SERVER}:{SMTP_PORT}")
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
+        
+        # Check if we should use SSL based on port 465 or explicit SSL flag if we had one
+        # For now, port 465 usually implies SSL
+        if SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        else:
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+            server.starttls()
+            
         print(f"Logging in as: {SMTP_USERNAME}")
         server.login(SMTP_USERNAME, SMTP_PASSWORD)
         text = msg.as_string()
@@ -113,54 +123,134 @@ def check_reminders():
         
         items = db.query(models.TORItem).all()
         
+        # Structure: { project_id: { 'name': str, 'email_reminders': [], 'email_reminders_full': [], 'line_reminders': [] } }
+        project_groups = {}
+
         for item in items:
-            reminders = []
-            
-            # # Check Start Date.  *******
-            # if item.start_date:
-            #     if item.start_date == today:
-            #         reminders.append(f"Task '{item.task_name}' starts TODAY ({item.start_date}).")
-            #     elif item.start_date == today + timedelta(days=DATE_ALERT):
-            #         reminders.append(f"Task '{item.task_name}' starts in {DATE_ALERT} days ({item.start_date}).")
+            # Prepare task names
+            task_name_full = item.task_name or ""
+            task_name_short = task_name_full
+            if len(task_name_short) > 40:
+                task_name_short = task_name_short[:40] + "..."
 
             # Check End Date
             if item.end_date:
-                if item.end_date == today:
-                    reminders.append(f"Task '{item.task_name}' ends TODAY ({item.end_date}).")
-                elif item.end_date == today + timedelta(days=DATE_ALERT):
-                    reminders.append(f"Task '{item.task_name}' ends in {DATE_ALERT} days ({item.end_date}).")
-
-            if reminders:
-                subject = f"TOR Reminder: {item.task_name}"
+                delta = (item.end_date - today).days
                 
-                if ALERT_METHOD == "LINE":
-                    # Create LINE text messages
-                    # LINE Text message object format: {"type": "text", "text": "..."}
-                    line_msgs = []
+                # Determine eligibility
+                is_email_due = False
+                is_line_due = False
+                
+                # Logic: 
+                # Project 168: Warranty Reminders
+                if item.project_id == 168:
+                    if item.start_date:
+                        anniv_1 = item.start_date + relativedelta(years=1)
+                        anniv_2 = item.start_date + relativedelta(years=2)
+                        print(f"anniv_1 :  {anniv_1}")
+                        print(f"anniv_2 :  {anniv_2}")
+                        
+                        # Start Date, 1st and 2nd Year Anniversary
+                        if today == item.start_date or today == anniv_1 or today == anniv_2:
+                            is_email_due = True
+                            is_line_due = True
                     
-                    # # Header message
-                    # line_msgs.append({
-                    #     "type": "text",
-                    #     "text": f"🔔 {subject}"
-                    # })
+                    # Last Year: Daily reminder 7 days before expiry
+                    if 0 <= delta <= 7:
+                        is_email_due = True
+                        is_line_due = True
+
+                # Default Logic: 
+                # Email: 0 <= delta <= DATE_ALERT
+                elif 0 <= delta <= DATE_ALERT:
+                    is_email_due = True
                     
-                    # Content message (combining reminders to avoid blowing limits)
-                    body_text = "\n".join([f"- {r}" for r in reminders])
-                    line_msgs.append({
-                        "type": "text",
-                        "text": body_text
-                    })
+                # LINE: delta == 0 or delta == DATE_ALERT
+                if delta == 0 or delta == DATE_ALERT:
+                    is_line_due = True
+                
+                # Check Configuration
+                send_email_flag = False
+                send_line_flag = False
+                
+                if ALERT_METHOD == "BOTH":
+                    if is_email_due: send_email_flag = True
+                    if is_line_due: send_line_flag = True
+                elif ALERT_METHOD == "LINE":
+                    if is_line_due: send_line_flag = True
+                else: # Default EMAIL
+                    if is_email_due: send_email_flag = True
+
+                if send_email_flag or send_line_flag:
+                    # Message Creation
+                    msg_suffix = ""
+                    if delta == 0:
+                        msg_suffix = f"ends TODAY ({item.end_date.strftime('%d-%m-%Y')})."
+                    elif delta == 1:
+                        msg_suffix = f"ends TOMORROW ({item.end_date.strftime('%d-%m-%Y')})."
+                    else:
+                        msg_suffix = f"ends in {delta} days ({item.end_date.strftime('%d-%m-%Y')})."
+
+                    base_msg_short = f"{item.task_id} : {task_name_short} {msg_suffix}"
+                    base_msg_full = f"{item.task_id} : {task_name_full} {msg_suffix}"
+
+                    # Identify Project
+                    if item.project:
+                        p_id = item.project.id
+                        p_name = item.project.name
+                    else:
+                        p_id = -1
+                        p_name = "General / No Project"
+
+                    if p_id not in project_groups:
+                        project_groups[p_id] = {
+                            'name': p_name,
+                            'email_reminders': [],
+                            'email_reminders_full': [],
+                            'line_reminders': []
+                        }
+
+                    if send_email_flag:
+                        project_groups[p_id]['email_reminders'].append(base_msg_short)
+                        project_groups[p_id]['email_reminders_full'].append(base_msg_full)
                     
-                    send_line_message(line_msgs)
-                    
-                else: 
-                    # Default to EMAIL
-                    body = "<ul>" + "".join([f"<li>{r}</li>" for r in reminders]) + "</ul>"
-                    send_email(SMTP_FROM, subject, body) 
+                    if send_line_flag:
+                        project_groups[p_id]['line_reminders'].append(base_msg_short)
+
+        # Process each group
+        for p_id, group in project_groups.items():
+            email_reminders_full = group['email_reminders_full']
+            line_reminders = group['line_reminders']
+            project_name = group['name']
+
+            # Send LINE
+            if line_reminders:
+                line_msgs = []
+                flex_message = line_templates.create_reminder_flex_message(project_name, str(today), line_reminders)
+                line_msgs.append(flex_message)
+                send_line_message(line_msgs)
+
+            # Send EMAIL
+            if email_reminders_full:
+                subject = f"TOR Reminders - {project_name} ({today})"
+                body = f"<h2>Project: {project_name}</h2>"
+                body += "<ul>" + "".join([f"<li>{r}</li>" for r in email_reminders_full]) + "</ul>"
+                
+                # Add Enter Site Button (Premium Design)
+                body += email_templates.get_enter_site_button_html()
+                
+                if MAIL_TO:
+                    recipients = [email.strip() for email in MAIL_TO.split(',')]
+                    for recipient in recipients:
+                        if recipient:
+                            send_email(recipient, subject, body)
+                else:
+                    print("MAIL_TO not configured in .env")
 
     finally:
         db.close()
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(check_reminders, 'interval', hours=24) # Run once a day
-# scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
+# scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 9:00 AM
+# scheduler.add_job(check_reminders, 'interval', hours=24) # Run once a day
+scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing

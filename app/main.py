@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Request, Form
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -40,7 +40,7 @@ import os
 
 @app.get("/template")
 def download_template():
-    file_path = "Redesign.xlsx"
+    file_path = "./TOR_template.xlsx"
     if os.path.exists(file_path):
         return FileResponse(file_path, filename="TOR_Template.xlsx", media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     return {"error": "Template file not found"}
@@ -187,12 +187,109 @@ async def upload_excel(project_id: int, file: UploadFile = File(...), db: Sessio
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
-@app.get("/items/", response_model=List[schemas.TORItem])
-def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
-    items = crud.get_tor_items(db, skip=skip, limit=limit)
-    return items
+@app.get("/projects/{project_id}/analytics")
+def read_analytics(request: Request, project_id: int, db: Session = Depends(database.get_db)):
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    items = crud.get_tor_items(db, project_id=project_id, limit=10000)
+    
+    total_tasks = len(items)
+    if total_tasks > 0:
+        avg_progress = sum(item.progress for item in items) / total_tasks
+    else:
+        avg_progress = 0
+        
+    today = datetime.now().date()
+    # Overdue: End date passed AND progress < 100
+    overdue_tasks = sum(1 for item in items if item.end_date and item.end_date < today and item.progress < 100)
+    completed_tasks = sum(1 for item in items if item.progress == 100)
+    
+    # Chart Data Preparation
+    status_counts = {
+        "not_started": sum(1 for item in items if item.progress == 0),
+        "in_progress": sum(1 for item in items if 0 < item.progress < 100),
+        "completed": completed_tasks
+    }
+    
+    responsible_counts = {}
+    for item in items:
+        resp = item.responsible or "Unassigned"
+        # Split multiple responsible logic if needed? Assuming single string for now or taking first part
+        # Let's keep it simple grouped by the exact string
+        responsible_counts[resp] = responsible_counts.get(resp, 0) + 1
+        
+    # Sort responsible by count desc and take top 10 to avoid overcrowding
+    responsible_counts = dict(sorted(responsible_counts.items(), key=lambda item: item[1], reverse=True)[:10])
+
+    stats = {
+        "total_tasks": total_tasks,
+        "avg_progress": round(avg_progress, 1),
+        "overdue_tasks": overdue_tasks,
+        "completed_tasks": completed_tasks
+    }
+    
+    chart_data = {
+        "status": status_counts,
+        "responsible": responsible_counts
+    }
+
+    return templates.TemplateResponse("analytics.html", {
+        "request": request,
+        "project": project,
+        "stats": stats,
+        "chart_data": chart_data
+    })
+
+@app.get("/projects/{project_id}/export")
+def export_project_excel(project_id: int, db: Session = Depends(database.get_db)):
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    items = crud.get_tor_items(db, project_id=project_id, limit=10000)
+    
+    # Convert to DataFrame
+    data = []
+    for item in items:
+        data.append({
+            "Task ID": item.task_id,
+            "Task Name": item.task_name,
+            "Start Date": item.start_date,
+            "End Date": item.end_date,
+            "Progress": item.progress,
+            "Responsible": item.responsible,
+            "Source File": item.source_file
+        })
+    
+    df = pd.DataFrame(data)
+    
+    # Create BytesIO buffer
+    output = io.BytesIO()
+    
+    # Write to Excel
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='TOR Items')
+        
+    output.seek(0)
+    
+    filename = f"{project.name}_TOR_Export_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    
+    headers = {
+        'Content-Disposition': f'attachment; filename="{filename}"'
+    }
+    
+    return StreamingResponse(output, headers=headers, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 @app.delete("/projects/{project_id}/delete_source/{source_file}")
 def delete_source(project_id: int, source_file: str, db: Session = Depends(database.get_db)):
     crud.delete_items_by_source(db, project_id, source_file)
     return {"message": f"Data from {source_file} deleted"}
+
+@app.delete("/items/{item_id}")
+def delete_item(item_id: int, db: Session = Depends(database.get_db)):
+    item = crud.delete_tor_item(db, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"message": "Item deleted"}

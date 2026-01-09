@@ -61,3 +61,10 @@ def delete_all_tor_items(db: Session):
 def delete_items_by_source(db: Session, project_id: int, source_file: str):
     db.query(models.TORItem).filter(models.TORItem.project_id == project_id, models.TORItem.source_file == source_file).delete()
     db.commit()
+
+def delete_tor_item(db: Session, item_id: int):
+    item = db.query(models.TORItem).filter(models.TORItem.id == item_id).first()
+    if item:
+        db.delete(item)
+        db.commit()
+    return item
