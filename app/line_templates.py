@@ -5,6 +5,16 @@ def create_reminder_flex_message(project_name, date_str, reminders):
     
     # Construct Flex Message Bubble body
     bubble_body_contents = []
+
+    # Header
+    bubble_body_contents.append({
+        "type": "text",
+        "text": f"🔔 {project_name}",
+        "weight": "bold",
+        "size": "xl",
+        "color": "#1F2937",
+        "wrap": True
+    })
     
     # Date
     bubble_body_contents.append({
