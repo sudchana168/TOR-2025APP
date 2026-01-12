@@ -29,8 +29,8 @@ LINE_USER_ID = clean_env(os.getenv("LINE_USER_ID"))
 LINE_RETRY_KEY = clean_env(os.getenv("LINE_RETRY_KEY")) # Optional
 ALERT_METHOD = clean_env(os.getenv("ALERT_METHOD", "EMAIL")).upper() # EMAIL or LINE
 
-print(f"DATE_ALERT :  {DATE_ALERT}")
-print(f"ALERT_METHOD: {ALERT_METHOD}")
+# print(f"DATE_ALERT :  {DATE_ALERT}")
+# print(f"ALERT_METHOD: {ALERT_METHOD}")
 
 
 def send_email(to_email: str, subject: str, body: str):
@@ -44,7 +44,7 @@ def send_email(to_email: str, subject: str, body: str):
     body = clean_env(body)
     to_email = clean_env(to_email)
 
-    print(f"TO EMAIL : {to_email}")
+    # print(f"TO EMAIL : {to_email}")
 
     
     msg = MIMEMultipart()
@@ -147,8 +147,6 @@ def check_reminders():
                     if item.start_date:
                         anniv_1 = item.start_date + relativedelta(years=1)
                         anniv_2 = item.start_date + relativedelta(years=2)
-                        print(f"anniv_1 :  {anniv_1}")
-                        print(f"anniv_2 :  {anniv_2}")
                         
                         # Start Date, 1st and 2nd Year Anniversary
                         if today == item.start_date or today == anniv_1 or today == anniv_2:
@@ -251,6 +249,6 @@ def check_reminders():
         db.close()
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 9:00 AM
+scheduler.add_job(check_reminders, 'cron', hour=11, minute=0) # Run everyday at 10:00 AM
 # scheduler.add_job(check_reminders, 'interval', hours=24) # Run once a day
 # scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
