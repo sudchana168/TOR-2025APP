@@ -30,8 +30,7 @@ LINE_RETRY_KEY = clean_env(os.getenv("LINE_RETRY_KEY")) # Optional
 ALERT_METHOD = clean_env(os.getenv("ALERT_METHOD", "EMAIL")).upper() # EMAIL or LINE
 
 # print(f"DATE_ALERT :  {DATE_ALERT}")
-# print(f"ALERT_METHOD: {ALERT_METHOD}")
-
+print(f"ALERT_METHOD: {ALERT_METHOD}")
 
 def send_email(to_email: str, subject: str, body: str):
     if not SMTP_USERNAME or not SMTP_PASSWORD:
