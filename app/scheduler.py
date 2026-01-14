@@ -223,13 +223,13 @@ def check_reminders():
             # Send LINE
             if line_reminders:
                 line_msgs = []
-                flex_message = line_templates.create_reminder_flex_message(project_name, str(today), line_reminders)
+                flex_message = line_templates.create_reminder_flex_message(project_name, today.strftime('%d-%m-%Y'), line_reminders)
                 line_msgs.append(flex_message)
                 send_line_message(line_msgs)
 
             # Send EMAIL
             if email_reminders_full:
-                subject = f"TOR Reminders - {project_name} ({today})"
+                subject = f"TOR Reminders - {project_name} ({today.strftime('%d-%m-%Y')})"
                 body = f"<h2>Project: {project_name}</h2>"
                 body += "<ul>" + "".join([f"<li>{r}</li>" for r in email_reminders_full]) + "</ul>"
                 
