@@ -1,5 +1,6 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 import smtplib
@@ -119,8 +120,18 @@ def check_reminders():
     db = database.SessionLocal()
     try:
         today = date.today()
+        limit_date = today + timedelta(days=DATE_ALERT)
         
-        items = db.query(models.TORItem).all()
+        # Optimize query: Join with Project and filter 
+        # 1. Items with end_date <= limit_date (Approaching deadline)
+        # 2. OR Items in Project 168 (Special logic for anniversaries)
+        # items = db.query(models.TORItem).options(joinedload(models.TORItem.project)).filter(models.TORItem.end_date != None).all()
+        items = db.query(models.TORItem).options(joinedload(models.TORItem.project)).filter(
+            or_(
+                models.TORItem.end_date <= limit_date,
+                models.TORItem.project_id == 168
+            )
+        ).all()
         
         # Structure: { project_id: { 'name': str, 'email_reminders': [], 'email_reminders_full': [], 'line_reminders': [] } }
         project_groups = {}
