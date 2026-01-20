@@ -1,4 +1,4 @@
-# from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from datetime import date, timedelta
@@ -258,7 +258,7 @@ def check_reminders():
     finally:
         db.close()
 
-# scheduler = BackgroundScheduler()
-# scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 10:00 AM
+scheduler = BackgroundScheduler()
+scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 10:00 AM
 # scheduler.add_job(check_reminders, 'interval', hours=24) # Run once a day
 # scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
