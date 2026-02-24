@@ -124,12 +124,12 @@ def check_reminders():
         
         # Optimize query: Join with Project and filter 
         # 1. Items with end_date <= limit_date (Approaching deadline)
-        # 2. OR Items in Project 168 (Special logic for anniversaries)
+        # 2. OR Items in Project 2 (Special logic for anniversaries)
         # items = db.query(models.TORItem).options(joinedload(models.TORItem.project)).filter(models.TORItem.end_date != None).all()
         items = db.query(models.TORItem).options(joinedload(models.TORItem.project)).filter(
             or_(
                 models.TORItem.end_date <= limit_date,
-                models.TORItem.project_id == 168
+                models.TORItem.project_id == 2
             )
         ).all()
         
@@ -152,8 +152,8 @@ def check_reminders():
                 is_line_due = False
                 
                 # Logic: 
-                # Project 168: Warranty Reminders
-                if item.project_id == 168:
+                # Project 2: Warranty Reminders
+                if item.project_id == 2:
                     if item.start_date:
                         anniv_1 = item.start_date + relativedelta(years=1)
                         anniv_2 = item.start_date + relativedelta(years=2)
@@ -259,6 +259,6 @@ def check_reminders():
         db.close()
 
 scheduler = BackgroundScheduler()
-# scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 10:00 AM
+scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 10:00 AM
 # scheduler.add_job(check_reminders, 'interval', hours=24) # Run once a day
 # scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
