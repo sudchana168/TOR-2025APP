@@ -34,7 +34,12 @@
                         </div>
                     </div>
                     <div class="flex items-center">
-
+                        {% if request.url.path != '/login' %}
+                        <a href="/logout"
+                            class="ml-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors shadow-sm">
+                            Logout
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -56,17 +61,41 @@
         <div class="bg-white rounded-lg p-6 max-w-md w-full shadow-xl">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Upload Excel File</h3>
             <form id="uploadForm" class="space-y-4">
+
+                <!-- Template Selection -->
+                <div>
+                    <label for="templateType" class="block text-sm font-medium text-gray-700">Template Type</label>
+                    <select id="templateType" name="templateType"
+                        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="default">Default Template</option>
+                        <option value="master_meter">New Template</option>
+                    </select>
+                </div>
+
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Select File</label>
                     <input type="file" id="fileInput" accept=".xlsx, .xls"
                         class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
                 </div>
-                <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="document.getElementById('uploadModal').classList.add('hidden')"
+
+                <!-- Sheet Selection (Hidden by default) -->
+                <div id="sheetSelectionContainer" class="hidden">
+                    <label for="sheetName" class="block text-sm font-medium text-gray-700">Select Sheet</label>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <select id="sheetName" name="sheetName"
+                            class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            <!-- Populated dynamically -->
+                        </select>
+                        <span id="loadingSheets" class="hidden text-sm text-indigo-600">Loading...</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeUploadModal()"
                         class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
                         Cancel
                     </button>
-                    <button type="submit"
+                    <button type="submit" id="uploadSubmitBtn"
                         class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
                         Upload
                     </button>
@@ -76,21 +105,74 @@
     </div>
 
     <script>
+        function closeUploadModal() {
+            document.getElementById('uploadModal').classList.add('hidden');
+            document.getElementById('uploadForm').reset();
+            document.getElementById('sheetSelectionContainer').classList.add('hidden');
+            document.getElementById('sheetName').innerHTML = '';
+        }
+
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            const templateType = document.getElementById('templateType').value;
+            const projectId = "{{ project.id if project else '' }}";
+
+            if (!file || !projectId) return;
+
+            // Optional: You could always show sheet selector or only for master_meter. Let's do it always if a file is uploaded.
+            const container = document.getElementById('sheetSelectionContainer');
+            const select = document.getElementById('sheetName');
+            const loading = document.getElementById('loadingSheets');
+
+            container.classList.remove('hidden');
+            select.disabled = true;
+            loading.classList.remove('hidden');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(`/projects/${projectId}/upload/sheets`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    select.innerHTML = data.sheets.map(sheet => `<option value="${sheet}">${sheet}</option>`).join('');
+                } else {
+                    select.innerHTML = `<option value="">Error loading sheets</option>`;
+                }
+            } catch (err) {
+                select.innerHTML = `<option value="">Error loading sheets</option>`;
+            } finally {
+                select.disabled = false;
+                loading.classList.add('hidden');
+            }
+        });
+
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const fileInput = document.getElementById('fileInput');
             if (!fileInput.files[0]) return;
 
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-
-            // project.id is only available in project dashboard context
-            // checking if project exists
             const projectId = "{{ project.id if project else '' }}";
             if (!projectId) {
                 alert("Cannot upload without a selected project.");
                 return;
             }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('template_type', document.getElementById('templateType').value);
+
+            const sheetName = document.getElementById('sheetName').value;
+            if (sheetName) {
+                formData.append('sheet_name', sheetName);
+            }
+
+            const btn = document.getElementById('uploadSubmitBtn');
+            btn.disabled = true;
+            btn.innerText = 'Uploading...';
 
             try {
                 const response = await fetch(`/projects/${projectId}/upload/`, {
@@ -107,6 +189,9 @@
                 }
             } catch (err) {
                 alert('Upload failed');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Upload';
             }
         });
     </script>

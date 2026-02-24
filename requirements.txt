@@ -10,3 +10,5 @@ python-dotenv
 pydantic
 email-validator
 requests
+passlib[bcrypt]
+python-jose[cryptography]

@@ -6,17 +6,30 @@ from sqlalchemy.orm import Session
 from typing import List
 import pandas as pd
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from . import models, schemas, crud, database, scheduler
+from . import models, schemas, crud, database, scheduler, auth
 
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
 
+@app.exception_handler(auth.RequiresLoginException)
+async def requires_login_exception_handler(request: Request, exc: auth.RequiresLoginException):
+    return RedirectResponse(url="/login")
+
 @app.on_event("startup")
 def start_scheduler():
     scheduler.scheduler.start()
+    db = database.SessionLocal()
+    try:
+        user = crud.get_user_by_username(db, "admin")
+        if not user:
+            hashed = auth.get_password_hash("forth1234")
+            user_in = schemas.UserCreate(username="admin", password="forth1234")
+            crud.create_user(db, user_in, hashed_password=hashed)
+    finally:
+        db.close()
 
 import os
 
@@ -31,8 +44,34 @@ templates = Jinja2Templates(directory="app/templates")
 def chrome_devtools_hack():
     return {}
 
+
+@app.get("/login")
+def login_get(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/login")
+def login_post(request: Request, username: str = Form(...), password: str = Form(...), db: Session = Depends(database.get_db)):
+    user = crud.get_user_by_username(db, username=username)
+    if not user or not auth.verify_password(password, user.hashed_password):
+        return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid username or password"})
+    
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    
+    response = RedirectResponse(url="/", status_code=303)
+    response.set_cookie(key="access_token", value=access_token, httponly=True, max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    return response
+
+@app.get("/logout")
+def logout():
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie("access_token")
+    return response
+
 @app.get("/")
-def read_root(request: Request, db: Session = Depends(database.get_db)):
+def read_root(request: Request, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     projects = crud.get_projects(db)
     return templates.TemplateResponse("projects.html", {"request": request, "projects": projects})
 
@@ -51,13 +90,13 @@ def create_project(
     name: str = Form(...),
     description: str = Form(None),
     db: Session = Depends(database.get_db)
-):
+, current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     project_data = schemas.ProjectCreate(name=name, description=description)
     crud.create_project(db, project_data)
     return RedirectResponse(url="/", status_code=303)
 
 @app.get("/projects/{project_id}/dashboard")
-def read_dashboard(request: Request, project_id: int, db: Session = Depends(database.get_db)):
+def read_dashboard(request: Request, project_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     project = crud.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -65,7 +104,7 @@ def read_dashboard(request: Request, project_id: int, db: Session = Depends(data
     return templates.TemplateResponse("index.html", {"request": request, "items": items, "project": project})
 
 @app.get("/projects/{project_id}/add")
-def add_form(request: Request, project_id: int, db: Session = Depends(database.get_db)):
+def add_form(request: Request, project_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     project = crud.get_project(db, project_id)
     return templates.TemplateResponse("form.html", {"request": request, "project": project})
 
@@ -78,9 +117,10 @@ async def add_item(
     start_date: str = Form(...),
     end_date: str = Form(...),
     responsible: str = Form(None),
+    delivery_term: str = Form(None),
     progress: float = Form(0.0),
     db: Session = Depends(database.get_db)
-):
+, current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     item_data = schemas.TORItemCreate(
         project_id=project_id,
         task_id=task_id,
@@ -88,13 +128,14 @@ async def add_item(
         start_date=datetime.strptime(start_date, '%Y-%m-%d').date(),
         end_date=datetime.strptime(end_date, '%Y-%m-%d').date(),
         responsible=responsible,
+        delivery_term=delivery_term,
         progress=progress
     )
     crud.create_tor_item(db, item_data)
     return RedirectResponse(url=f"/projects/{project_id}/dashboard", status_code=303)
 
 @app.get("/edit/{item_id}")
-def edit_form(request: Request, item_id: int, db: Session = Depends(database.get_db)):
+def edit_form(request: Request, item_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     item = crud.get_tor_item(db, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -109,9 +150,10 @@ async def edit_item(
     start_date: str = Form(...),
     end_date: str = Form(...),
     responsible: str = Form(None),
+    delivery_term: str = Form(None),
     progress: float = Form(0.0),
     db: Session = Depends(database.get_db)
-):
+, current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     # Fetch existing item to get project_id
     existing_item = crud.get_tor_item(db, item_id)
     if not existing_item:
@@ -124,52 +166,114 @@ async def edit_item(
         start_date=datetime.strptime(start_date, '%Y-%m-%d').date(),
         end_date=datetime.strptime(end_date, '%Y-%m-%d').date(),
         responsible=responsible,
+        delivery_term=delivery_term,
         progress=progress
     )
     crud.update_tor_item(db, item_id, item_data)
     
     return RedirectResponse(url=f"/projects/{existing_item.project_id}/dashboard", status_code=303)
 
+@app.post("/projects/{project_id}/upload/sheets")
+async def get_excel_sheets(project_id: int, file: UploadFile = File(...), current_user: models.User = Depends(auth.get_current_user_from_cookie)):
+    if not file.filename.endswith(('.xls', '.xlsx')):
+        raise HTTPException(status_code=400, detail="Invalid file format")
+    contents = await file.read()
+    try:
+        xl = pd.ExcelFile(io.BytesIO(contents))
+        return {"sheets": xl.sheet_names}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading file sheets: {str(e)}")
+
 @app.post("/projects/{project_id}/upload/")
-async def upload_excel(project_id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db)):
+async def upload_excel(
+    project_id: int, 
+    file: UploadFile = File(...), 
+    template_type: str = Form("default"),
+    sheet_name: str = Form(None),
+    db: Session = Depends(database.get_db)
+, current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     if not file.filename.endswith(('.xls', '.xlsx')):
         raise HTTPException(status_code=400, detail="Invalid file format")
     
     contents = await file.read()
     try:
-        # Read with header=2 (Row 3 in Excel) as per Redesign.xlsx structure
-        df = pd.read_excel(io.BytesIO(contents), header=2)
+        excel_errors = ['#REF!', '#VALUE!', '#DIV/0!', '#NAME?', '#NUM!', '#NULL!', '#N/A']
+        
+        # Determine how to read the excel file based on sheet_name
+        read_kwargs = {'header': 2, 'na_values': excel_errors}
+        if sheet_name:
+            read_kwargs['sheet_name'] = sheet_name
+            
+        df = pd.read_excel(io.BytesIO(contents), **read_kwargs)
+        
+        source_name = file.filename
+        if sheet_name:
+            source_name = f"{file.filename} ({sheet_name})"
         
         # Clear existing data for this file AND project
-        crud.delete_items_by_source(db, project_id, file.filename)
+        crud.delete_items_by_source(db, project_id, source_name)
         
         for index, row in df.iterrows():
-            # ... (mapping logic unchanged) ...
-            # Unnamed: 0 -> Task ID
-            # Unnamed: 1 -> Task Name
-            # Unnamed: 2 -> Start Date
-            # Unnamed: 3 -> End Date
-            # Unnamed: 5 -> Progress
-            # Unnamed: 6 -> Responsible
-            
-            task_id = row.get('Unnamed: 0')
-            task_name = row.get('Unnamed: 1')
+            if template_type == 'master_meter':
+                # Master Meter Mapping:
+                # 0: Task ID
+                # 1: Task Name
+                # 2: Delivery (TOR)
+                # 3: Start Date
+                # 4: End Date
+                # 5: placeholder
+                # 6: Progress
+                # 7: Responsible
+                task_id = row.get('Unnamed: 0')
+                task_name = row.get('Unnamed: 1')
+                delivery_term_raw = row.get('Unnamed: 2')
+                start_raw = row.get('Unnamed: 3')
+                end_raw = row.get('Unnamed: 4')
+                progress_raw = row.get('Unnamed: 6')
+                resp_raw = row.get('Unnamed: 7')
+                
+                if str(delivery_term_raw).strip().upper() == 'X':
+                    delivery_term = 'T'
+                else:
+                    delivery_term = 'F'
+            else:
+                # Default Mapping (Redesign.xlsx)
+                # 0: Task ID
+                # 1: Task Name
+                # 2: Start Date
+                # 3: End Date
+                # 5: Progress
+                # 6: Responsible
+                task_id = row.get('Unnamed: 0')
+                task_name = row.get('Unnamed: 1')
+                delivery_term = None
+                start_raw = row.get('Unnamed: 2')
+                end_raw = row.get('Unnamed: 3')
+                progress_raw = row.get('Unnamed: 5')
+                resp_raw = row.get('Unnamed: 6')
             
             # Relaxed check: Only skip if BOTH are missing, or if it's clearly empty
             if pd.isna(task_id) and pd.isna(task_name):
                 continue
             
-            # If Task ID is missing but Name exists, use a placeholder or keep it empty
             if pd.isna(task_id):
                 task_id = ""
             if pd.isna(task_name):
                 task_name = "Unnamed Task"
 
             try:
-                start_date = pd.to_datetime(row.get('Unnamed: 2'), dayfirst=True).date()
-                end_date = pd.to_datetime(row.get('Unnamed: 3'), dayfirst=True).date()
+                start_date = pd.to_datetime(start_raw, dayfirst=True).date()
+                end_date = pd.to_datetime(end_raw, dayfirst=True).date()
+                if pd.isna(start_date) or pd.isna(end_date):
+                    continue
             except:
                 continue # Skip invalid dates
+
+            # Safely parse progress to avoid float conversion errors
+            try:
+                progress_val = float(progress_raw) if not pd.isna(progress_raw) else 0.0
+            except (ValueError, TypeError):
+                progress_val = 0.0
 
             item_data = schemas.TORItemCreate(
                 project_id=project_id,
@@ -177,9 +281,10 @@ async def upload_excel(project_id: int, file: UploadFile = File(...), db: Sessio
                 task_name=str(task_name),
                 start_date=start_date,
                 end_date=end_date,
-                responsible=str(row.get('Unnamed: 6')) if not pd.isna(row.get('Unnamed: 6')) else None,
-                progress=float(row.get('Unnamed: 5', 0)) if not pd.isna(row.get('Unnamed: 5')) else 0.0,
-                source_file=file.filename
+                responsible=str(resp_raw) if not pd.isna(resp_raw) else None,
+                delivery_term=str(delivery_term) if not pd.isna(delivery_term) else None,
+                progress=progress_val,
+                source_file=source_name
             )
             crud.create_tor_item(db, item_data)
             
@@ -189,7 +294,7 @@ async def upload_excel(project_id: int, file: UploadFile = File(...), db: Sessio
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 @app.get("/projects/{project_id}/analytics")
-def read_analytics(request: Request, project_id: int, db: Session = Depends(database.get_db)):
+def read_analytics(request: Request, project_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     project = crud.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -284,12 +389,12 @@ def export_project_excel(project_id: int, db: Session = Depends(database.get_db)
     return StreamingResponse(output, headers=headers, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 @app.delete("/projects/{project_id}/delete_source/{source_file}")
-def delete_source(project_id: int, source_file: str, db: Session = Depends(database.get_db)):
+def delete_source(project_id: int, source_file: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     crud.delete_items_by_source(db, project_id, source_file)
     return {"message": f"Data from {source_file} deleted"}
 
 @app.delete("/items/{item_id}")
-def delete_item(item_id: int, db: Session = Depends(database.get_db)):
+def delete_item(item_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user_from_cookie)):
     item = crud.delete_tor_item(db, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")

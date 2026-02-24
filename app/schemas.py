@@ -22,6 +22,7 @@ class TORItemBase(BaseModel):
     start_date: date
     end_date: date
     responsible: Optional[str] = None
+    delivery_term: Optional[str] = None
     progress: Optional[float] = 0.0
 
 class TORItemCreate(TORItemBase):
@@ -36,3 +37,19 @@ class TORItem(TORItemBase):
 
     class Config:
         from_attributes = True
+
+class UserBase(BaseModel):
+    username: str
+
+class UserCreate(UserBase):
+    password: str
+
+class User(UserBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str

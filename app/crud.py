@@ -27,6 +27,7 @@ def create_tor_item(db: Session, tor_item: schemas.TORItemCreate):
         start_date=tor_item.start_date,
         end_date=tor_item.end_date,
         responsible=tor_item.responsible,
+        delivery_term=tor_item.delivery_term,
         progress=tor_item.progress,
         source_file=tor_item.source_file
     )
@@ -47,6 +48,7 @@ def update_tor_item(db: Session, item_id: int, tor_item: schemas.TORItemCreate):
         db_item.start_date = tor_item.start_date
         db_item.end_date = tor_item.end_date
         db_item.responsible = tor_item.responsible
+        db_item.delivery_term = tor_item.delivery_term
         db_item.progress = tor_item.progress
         # Note: We do NOT update source_file here to preserve origin
         
@@ -68,3 +70,13 @@ def delete_tor_item(db: Session, item_id: int):
         db.delete(item)
         db.commit()
     return item
+
+def get_user_by_username(db: Session, username: str):
+    return db.query(models.User).filter(models.User.username == username).first()
+
+def create_user(db: Session, user: schemas.UserCreate, hashed_password: str):
+    db_user = models.User(username=user.username, hashed_password=hashed_password)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
