@@ -199,8 +199,9 @@ def check_reminders():
                     else:
                         msg_suffix = f"ends in {delta} days ({item.end_date.strftime('%d-%m-%Y')})."
 
-                    base_msg_short = f"{item.task_id} : {task_name_short} {msg_suffix}"
-                    base_msg_full = f"{item.task_id} : {task_name_full} {msg_suffix}"
+                    delivery_suffix = " (ส่งมอบตาม TOR ✔)" if getattr(item, 'delivery_term', None) == 'T' else ""
+                    base_msg_short = f"{item.task_id} : {task_name_short} {msg_suffix}{delivery_suffix}"
+                    base_msg_full = f"{item.task_id} : {task_name_full} {msg_suffix}{delivery_suffix}"
 
                     # Identify Project
                     if item.project:
@@ -259,6 +260,6 @@ def check_reminders():
         db.close()
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 10:00 AM
+# scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 10:00 AM
 # scheduler.add_job(check_reminders, 'interval', hours=24) # Run once a day
-# scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
+scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
