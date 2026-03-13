@@ -260,8 +260,9 @@ def check_reminders():
         db.close()
 
 scheduler = BackgroundScheduler()
-
+# clean_env(os.getenv("LINE_RETRY_KEY"))
 TEST_MODE = os.getenv("TEST_MODE", "false")
+print(f"TEST_MODE: {TEST_MODE}")
 
 if TEST_MODE == "true":
     scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
