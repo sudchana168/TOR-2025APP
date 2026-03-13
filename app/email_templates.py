@@ -4,7 +4,7 @@ def get_enter_site_button_html():
     """
     return """
     <div style="margin-top: 35px; text-align: left;">
-        <a href="https://tor-notification.smg-service.app/" 
+        <a href="https://tor-notification.smg-service.app:8443/" 
            style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); 
                   color: white; 
                   padding: 12px 32px; 
