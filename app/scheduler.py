@@ -1,7 +1,7 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
 import smtplib
 from email.mime.text import MIMEText
@@ -279,6 +279,8 @@ TEST_MODE = clean_env(os.getenv("TEST_MODE", "false"))
 print(f"TEST_MODE: {TEST_MODE}")
 
 if TEST_MODE == "true":
-    scheduler.add_job(check_reminders, 'interval', seconds=10)
+    # รันเพียงครั้งเดียวหลังจากเริ่ม 10 วินาที
+    run_time = datetime.now() + timedelta(seconds=10)
+    scheduler.add_job(check_reminders, 'date', run_date=run_time)
 else:
     scheduler.add_job(check_reminders, 'cron', hour=10, minute=0)
