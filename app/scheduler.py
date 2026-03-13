@@ -282,6 +282,3 @@ if TEST_MODE == "true":
     scheduler.add_job(check_reminders, 'interval', seconds=10)
 else:
     scheduler.add_job(check_reminders, 'cron', hour=10, minute=0)
-
-if not scheduler.running:
-    scheduler.start()
