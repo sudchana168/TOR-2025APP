@@ -61,7 +61,7 @@ def create_reminder_flex_message(project_name, date_str, reminders):
                         "action": {
                             "type": "uri",
                             "label": "Enter Site",
-                            "uri": "https://tor-notification.smg-service.app/"
+                            "uri": "https://tor-notification.smg-service.app:8443/"
                         },
                         "style": "primary",
                         "color": "#4F46E5",
