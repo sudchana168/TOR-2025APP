@@ -260,6 +260,11 @@ def check_reminders():
         db.close()
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 10:00 AM
-# scheduler.add_job(check_reminders, 'interval', hours=24) # Run once a day
-# scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
+
+TEST_MODE = os.getenv("TEST_MODE", "false")
+
+if TEST_MODE == "true":
+    scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
+else:
+    scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 10:00 AM
+
