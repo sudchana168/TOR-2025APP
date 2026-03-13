@@ -259,13 +259,28 @@ def check_reminders():
     finally:
         db.close()
 
+# scheduler = BackgroundScheduler()
+# # clean_env(os.getenv("LINE_RETRY_KEY"))
+# TEST_MODE = os.getenv("TEST_MODE", "false")
+# print(f"TEST_MODE: {TEST_MODE}")
+
+# if TEST_MODE == "true":
+#     scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
+# else:
+#     scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 10:00 AM
+
+
+
 scheduler = BackgroundScheduler()
-# clean_env(os.getenv("LINE_RETRY_KEY"))
-TEST_MODE = os.getenv("TEST_MODE", "false")
+
+scheduler.remove_all_jobs()   # ป้องกัน job ซ้ำ
+
+TEST_MODE = clean_env(os.getenv("TEST_MODE", "false"))
 print(f"TEST_MODE: {TEST_MODE}")
 
 if TEST_MODE == "true":
-    scheduler.add_job(check_reminders, 'interval', seconds=10) # For testing
+    scheduler.add_job(check_reminders, 'interval', seconds=10)
 else:
-    scheduler.add_job(check_reminders, 'cron', hour=10, minute=0) # Run everyday at 10:00 AM
+    scheduler.add_job(check_reminders, 'cron', hour=10, minute=0)
 
+scheduler.start()
