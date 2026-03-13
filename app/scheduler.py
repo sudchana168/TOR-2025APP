@@ -283,4 +283,5 @@ if TEST_MODE == "true":
 else:
     scheduler.add_job(check_reminders, 'cron', hour=10, minute=0)
 
-scheduler.start()
+if not scheduler.running:
+    scheduler.start()
